@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Resizer & Cropper</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; position: relative; height: 100vh; overflow: hidden; }
+        canvas { border: 1px solid #ccc; margin-top: 10px; position: relative; }
+        #controls { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
+        #overlay { position: absolute; border: 2px dashed red; width: 800px; height: 433px; cursor: move; }
+        button { padding: 5px 10px; }
+    </style>
+</head>
+<body>
+    <h1>Image Resizer & Cropper</h1>
+    <p style="text-align: center; margin-bottom: 10px;">1. Drop an image. 2. Resize with bar/buttons. 3. Move red box to crop area. 4. Click to save.</p>
+    <input type="file" accept="image/*" id="imageInput" style="display: none;">
+    <div id="controls">
+        <button id="scaleDown">-</button>
+        <label>Scale: <input type="range" id="scaleRange" min="0.1" max="10" step="0.01" value="1"></label>
+        <button id="scaleUp">+</button>
+        <input type="number" id="scaleInput" min="0.1" max="10" step="0.01" value="1">
+        <button id="cropButton">Crop & Save</button>
+    </div>
+    <div style="position: relative;">
+        <canvas id="canvas"></canvas>
+        <div id="overlay"></div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scaleRange = document.getElementById('scaleRange');
+        const scaleInput = document.getElementById('scaleInput');
+        const scaleDown = document.getElementById('scaleDown');
+        const scaleUp = document.getElementById('scaleUp');
+        const cropButton = document.getElementById('cropButton');
+        const overlay = document.getElementById('overlay');
+
+        let image = new Image();
+        let scale = 1;
+        let imgWidth, imgHeight;
+        let dragging = false;
+        let overlayX = 0, overlayY = 0;
+        let offsetX, offsetY;
+
+        document.body.addEventListener('dragover', (e) => e.preventDefault());
+        document.body.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                image.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        image.onload = () => {
+            imgWidth = image.width;
+            imgHeight = image.height;
+            scale = Math.max(800 / imgWidth, 433 / imgHeight);
+            scaleRange.value = scale;
+            scaleInput.value = scale;
+            drawImage();
+        };
+
+        function drawImage() {
+            const width = imgWidth * scale;
+            const height = imgHeight * scale;
+            canvas.width = width;
+            canvas.height = height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, width, height);
+            positionOverlay();
+        }
+
+        function positionOverlay() {
+            overlay.style.left = `${overlayX}px`;
+            overlay.style.top = `${overlayY}px`;
+        }
+
+        overlay.addEventListener('mousedown', (e) => {
+            dragging = true;
+            offsetX = e.clientX - overlayX;
+            offsetY = e.clientY - overlayY;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (dragging) {
+                overlayX = e.clientX - offsetX;
+                overlayY = e.clientY - offsetY;
+                positionOverlay();
+            }
+        });
+
+        document.addEventListener('mouseup', () => dragging = false);
+
+        cropButton.addEventListener('click', () => {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            tempCanvas.width = 800;
+            tempCanvas.height = 433;
+
+            const canvasRect = canvas.getBoundingClientRect();
+            const overlayRect = overlay.getBoundingClientRect();
+
+            const cropX = (overlayRect.left - canvasRect.left) / scale;
+            const cropY = (overlayRect.top - canvasRect.top) / scale;
+
+            tempCtx.drawImage(image, cropX, cropY, 800 / scale, 433 / scale, 0, 0, 800, 433);
+
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = String(now.getFullYear()).slice(-2);
+            const dateString = `${day}${month}${year}`;
+
+            const randomString = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const fileName = `MW-${dateString}-${randomString}.png`;
+
+            const link = document.createElement('a');
+            link.href = tempCanvas.toDataURL('image/png');
+            link.download = fileName;
+            link.click();
+        });
+
+        scaleRange.addEventListener('input', (e) => {
+            scale = parseFloat(e.target.value);
+            scaleInput.value = scale;
+            drawImage();
+        });
+
+        scaleInput.addEventListener('input', (e) => {
+            scale = parseFloat(e.target.value);
+            scaleRange.value = scale;
+            drawImage();
+        });
+
+        scaleDown.addEventListener('click', () => {
+            scale = Math.max(0.1, scale - 0.01);
+            scaleInput.value = scale;
+            scaleRange.value = scale;
+            drawImage();
+        });
+
+        scaleUp.addEventListener('click', () => {
+            scale = Math.min(10, scale + 0.01);
+            scaleInput.value = scale;
+            scaleRange.value = scale;
+            drawImage();
+        });
+    </script>
+</body>
+</html>
